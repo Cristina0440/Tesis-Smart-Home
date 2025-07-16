@@ -36,90 +36,75 @@ def mostrar_modelos():
         - `mean_pf`: Factor de potencia (eficiencia eléctrica).  
         """)
 
-    st.markdown("---")
-    st.subheader("⚡ Comparación de Modelos – Clasificación del Consumo (Alto/Normal)")
 
-    datos_consumo = {
-        "Modelo": [
-            "Regresión Logística", "Árbol de Decisión", "Random Forest", 
-            "Gradient Boosting", "XGBoost"
-        ],
-        "Accuracy": [0.744, 0.978, 0.983, 0.983, 0.989],
-        "Precision": [0.778, 0.989, 1.000, 1.000, 1.000],
-        "Recall": [0.729, 0.969, 0.969, 0.969, 0.979],
-        "F1-score": [0.753, 0.979, 0.984, 0.984, 0.989]
+    st.markdown("---")
+    st.subheader("📊 Evaluación del Modelo de Regresión")
+
+    st.markdown("""
+    Para evaluar el rendimiento del modelo, se aplicaron dos estrategias complementarias:
+
+    - **Validación Cruzada (Cross-Validation):** Técnica que permite estimar el rendimiento del modelo dividiendo el conjunto de entrenamiento en varios bloques (folds). Proporciona métricas promedio más estables.
+    - **Evaluación Final en el Conjunto de Test:** Se separó el 20% del dataset original (con datos no vistos) para simular el comportamiento del modelo en un entorno real.
+
+    La división fue aproximadamente 80% para entrenamiento y 20% para test final.
+    """)
+
+    # Resultados reales obtenidos por ti
+    resumen_resultados = pd.DataFrame({
+        "Modelo": ["Random Forest"],
+        "MAE (CV)": [0.2497],
+        "RMSE (CV)": [0.6006],
+        "R² (CV)": [0.9957],
+        "MAE (Test)": [0.2362],
+        "RMSE (Test)": [0.5015],
+        "R² (Test)": [0.9963]
+    })
+
+    st.dataframe(resumen_resultados.style.format({
+        "MAE (CV)": "{:.4f}", "RMSE (CV)": "{:.4f}", "R² (CV)": "{:.4f}",
+        "MAE (Test)": "{:.4f}", "RMSE (Test)": "{:.4f}", "R² (Test)": "{:.4f}"
+    }))
+
+    st.success("El modelo mostró un **alto rendimiento y generalización**, manteniendo métricas estables entre validación cruzada y evaluación final.")
+
+    st.markdown("---")
+    st.subheader("📋 Predicciones del Modelo (Casos de ejemplo)")
+
+    data_pred = {
+        "Caso": [1, 2, 3, 4, 5],
+        "Valor Real (kWh)": [3.893, 14.496, 3.920, 31.990, 2.442],
+        "Predicción (kWh)": [3.916, 14.426, 3.930, 32.027, 2.459]
     }
 
-    df_consumo = pd.DataFrame(datos_consumo)
+    df_pred = pd.DataFrame(data_pred)
+    st.dataframe(df_pred, use_container_width=True)
 
-    def resaltar_consumo(fila):
-        return ['background-color: lightgreen' if fila["Modelo"] == "XGBoost" else "" for _ in fila]
-
-    st.dataframe(df_consumo.style.apply(resaltar_consumo, axis=1))
-    st.success("Se seleccionó **XGBoost** como modelo final por su gran balance entre precisión, recall y F1-score.")
-
-    st.markdown("---")
-    st.subheader("🔍 Comparación de Modelos – Clasificación del Tipo de Dispositivo")
-
-    datos_dispositivo = {
-        "Modelo": [
-            "Regresión Logística", "Árbol de Decisión", "Random Forest",
-            "Gradient Boosting", "XGBoost"
-        ],
-        "Accuracy": [0.761, 0.917, 0.950, 0.922, 0.911],
-        "F1-score": [0.703, 0.918, 0.941, 0.916, 0.906]
-    }
-
-    df_dispositivo = pd.DataFrame(datos_dispositivo)
-
-    def resaltar_dispositivo(fila):
-        return ['background-color: lightblue' if fila["Modelo"] == "Random Forest" else "" for _ in fila]
-
-    st.dataframe(df_dispositivo.style.apply(resaltar_dispositivo, axis=1))
-    st.success("Se seleccionó **Random Forest** como modelo para detección de dispositivos debido a su alta precisión multiclase.")
+    st.markdown("### 📉 Dispersión: Consumo Real vs Predicho")
+    fig_dispersion = px.scatter(
+        df_pred,
+        x="Valor Real (kWh)",
+        y="Predicción (kWh)",
+        trendline="ols",
+        labels={"Valor Real (kWh)": "Valor Real (kWh)", "Predicción (kWh)": "Predicción (kWh)"},
+        title="Gráfico de Dispersión: Valor Real vs Predicho"
+    )
+    st.plotly_chart(fig_dispersion, use_container_width=True)
 
     st.markdown("---")
-    st.subheader("📈 Modelo de Regresión ")
+    st.subheader("📊 Comparación de TMS (RMSE) entre Evaluaciones")
 
-    df = pd.read_csv("smart_home.csv")
+    fig_tms = px.bar(
+        x=["RMSE (Validación Cruzada)", "RMSE (Test Final)"],
+        y=[0.6006, 0.5015],
+        labels={"x": "Tipo de Evaluación", "y": "RMSE (W)"},
+        text=[0.6006, 0.5015],
+        title="Comparación de Error Cuadrático Medio (TMS / RMSE)"
+    )
+    fig_tms.update_traces(textposition='outside')
+    st.plotly_chart(fig_tms, use_container_width=True)
 
-    def extract_mean(column):
-        return df[column].apply(lambda x: np.mean(eval(x)) if pd.notna(x) else np.nan)
 
-    df["mean_voltage"] = extract_mean("voltages")
-    df["mean_current"] = extract_mean("currents")
-    df["mean_pf"] = extract_mean("powerFactors")
-    df["mean_power"] = extract_mean("activePowers")
-
-    df = df.dropna(subset=["mean_voltage", "mean_current", "mean_pf", "mean_power", "appliance", "brand", "application"])
-
-    le_appliance = LabelEncoder()
-    le_brand = LabelEncoder()
-    le_event = LabelEncoder()
-
-    df["appliance_encoded"] = le_appliance.fit_transform(df["appliance"].astype(str))
-    df["brand_encoded"] = le_brand.fit_transform(df["brand"].astype(str))
-    df["event_encoded"] = le_event.fit_transform(df["application"].astype(str))
-
-    X = df[["mean_voltage", "mean_current", "mean_pf", "appliance_encoded", "brand_encoded", "event_encoded"]]
-    y = df["mean_power"]
-
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-    modelo_rf = RandomForestRegressor(n_estimators=100, random_state=42)
-    modelo_rf.fit(X_train, y_train)
-
-    y_pred = modelo_rf.predict(X_test)
-
-    mae = mean_absolute_error(y_test, y_pred)
-    rmse = np.sqrt(mean_squared_error(y_test, y_pred))
-    r2 = r2_score(y_test, y_pred)
-
-    st.markdown("### 📊 Métricas del modelo")
-    st.markdown(f"- **MAE:** {mae:.3f} W")
-    st.markdown(f"- **RMSE:** {rmse:.3f} W")
-    st.markdown(f"- **R²:** {r2:.3f}")
-
+"""
     df_pred = pd.DataFrame({
         "consumo_real": y_test,
         "consumo_predicho": y_pred
@@ -134,3 +119,4 @@ def mostrar_modelos():
         labels={"consumo_real": "Consumo Real (W)", "consumo_predicho": "Consumo Predicho (W)"}
     )
     st.plotly_chart(fig, use_container_width=True)
+"""
